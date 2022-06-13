@@ -1,0 +1,56 @@
+###################################################################
+# Adds an nginx reverse proxy on top of noVNC and WebKitWebDriver 
+# This allows you to run the image on cloud container platforms 
+# while still being able to run tests and watch them at the same time. 
+###################################################################
+FROM jamesmortensen/webkitwebdriver-epiphany:latest
+
+USER root
+
+# Install nginx and helpful aliases
+RUN sudo apt-get update -y && sudo apt-get install nginx --no-install-recommends -y \
+  && apt-get autoremove -y \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
+  && echo "alias l='ls -ltr'" >> /home/seluser/.bashrc \
+  && echo "alias MiniBrowser='/usr/lib/`uname -m`-linux-gnu/webkit2gtk-4.0/MiniBrowser'" >> /home/seluser/.bashrc
+
+COPY nginx.template.conf /etc/nginx/
+COPY nginx-service.conf /etc/supervisor/conf.d/
+
+# Relaxing permissions to be able to start nginx without root
+RUN chmod 770 /var/log/nginx \
+ && chmod 660 /var/log/nginx/* \
+ && chmod 775 /run \
+ && chmod 775 /var/lib/nginx \
+ && chmod +x /dev/shm \
+ && chown root:adm /var/lib/nginx \
+ && chown root:adm /run \
+ && usermod -aG adm www-data \
+ && usermod -aG adm seluser
+
+ENV HOME=/home/seluser
+
+# Required in order for cloud based auto-generated users to have permissions to /home/seluser
+RUN sudo chmod -R 777 /home/seluser \
+  && sudo chgrp -R 0 /home/seluser \
+  && sudo chmod -R g=u /home/seluser
+
+# Container image debugging tools
+# RUN apt-get install vim telnet procps -y \
+#  && apt-get autoremove -y \
+#  && apt-get clean \
+#  && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
+USER seluser
+
+# Set VNC password at runtime, from the Heroku config vars, and clear it from the environment.
+CMD if [ -n "$VNC_SECRET_PW" ]; then x11vnc -storepasswd $VNC_SECRET_PW /home/seluser/.vnc/passwd; unset VNC_SECRET_PW; fi \
+  # Replaces the {{PORT}} template variable in the NGINX config with the platform assigned port
+  # And also replaces {{ACCESS_TOKEN}} template variable with the platform access token.
+  && sed 's/{{PORT}}/'"$PORT"'/' /etc/nginx/nginx.template.conf | sed 's/{{ACCESS_TOKEN}}/'"$ACCESS_TOKEN"'/' > /etc/nginx/nginx.conf; unset ACCESS_TOKEN \
+  # && cat /etc/nginx/nginx.conf \
+  # Start NGINX and other services
+  && /opt/bin/entry_point.sh
+
+EXPOSE $PORT
