@@ -36,6 +36,9 @@ RUN sudo chmod -R 777 /home/seluser \
   && sudo chgrp -R 0 /home/seluser \
   && sudo chmod -R g=u /home/seluser
 
+# Make sure WebKitWebDriver restarts if it crashes
+RUN sed -zi 's/\[program:webkit-webdriver].*autorestart=false/[program:webkit-webdriver]\npriority=15\ncommand=WebKitWebDriver -p 4444 --host=0.0.0.0\nautostart=true\nautorestart=true/' /etc/supervisor/conf.d/services.conf
+
 # Container image debugging tools
 # RUN apt-get install vim telnet procps -y \
 #  && apt-get autoremove -y \
