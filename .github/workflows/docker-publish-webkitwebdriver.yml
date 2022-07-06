@@ -7,17 +7,18 @@ name: Docker
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "docker-publish-webkitwebdriver" ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 
 env:
   # Use docker.io for Docker Hub if empty
   # github.repository as <account>/<repo>
   # REGISTRY: 
-  IMAGE_NAME: 'jamesmortensen/webkitwebdriver-epiphany-cloud'
+  IMAGE_NAME: 'jamesmortensen1/webkitwebdriver-epiphany-cloud'
 
 
 jobs:
@@ -64,6 +65,7 @@ jobs:
         uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
         with:
           context: .
+          file: Dockerfile.epiphany.nginx
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
