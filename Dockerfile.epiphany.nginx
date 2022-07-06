@@ -19,8 +19,8 @@ COPY nginx.template.conf /etc/nginx/
 COPY nginx-service.conf /etc/supervisor/conf.d/
 
 # Relaxing permissions to be able to start nginx without root
-RUN chmod 770 /var/log/nginx \
- && chmod 660 /var/log/nginx/* \
+RUN chmod 777 /var/log/nginx \
+ && chmod 666 /var/log/nginx/* \
  && chmod 775 /run \
  && chmod 775 /var/lib/nginx \
  && chmod +x /dev/shm \
