@@ -21,8 +21,23 @@ COPY nginx-service.conf /etc/supervisor/conf.d/
 # Relaxing permissions to be able to start nginx without root
 RUN chmod 777 /var/log/nginx \
  && chmod 666 /var/log/nginx/* \
+ && touch /var/log/nginx/access.log \
+ && touch /var/log/nginx/error.log \
+ && mkdir /var/lib/nginx/body \
+ && mkdir /var/lib/nginx/proxy \
+ && mkdir /var/lib/nginx/uwsgi \
+ && mkdir /var/lib/nginx/scgi \
+ && mkdir /var/lib/nginx/fastcgi \
+ && chmod 775 /var/lib/nginx/body \
+ && chmod 775 /var/lib/nginx/proxy \
+ && chmod 775 /var/lib/nginx/uwsgi \
+ && chmod 775 /var/lib/nginx/scgi \
+ && chmod 775 /var/lib/nginx/fastcgi \
  && chmod 775 /run \
- && chmod 775 /var/lib/nginx \
+ && chmod 777 /var/lib/nginx \
+ && touch /etc/nginx/nginx.conf \
+ && chmod 777 /etc/nginx \
+ && chmod 777 /etc/nginx/nginx.conf \
  && chmod +x /dev/shm \
  && chown root:adm /var/lib/nginx \
  && chown root:adm /run \
