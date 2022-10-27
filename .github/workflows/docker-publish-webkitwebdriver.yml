@@ -81,3 +81,4 @@ jobs:
           #tags: ${{ steps.meta.outputs.tags }}
           tags: ${{ steps.tagging.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
