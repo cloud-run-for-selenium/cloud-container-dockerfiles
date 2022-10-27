@@ -12,8 +12,7 @@ RUN sudo apt-get update -y && sudo apt-get install nginx --no-install-recommends
   && apt-get autoremove -y \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
-  && echo "alias l='ls -ltr'" >> /home/seluser/.bashrc \
-  && echo "alias MiniBrowser='/usr/lib/`uname -m`-linux-gnu/webkit2gtk-4.0/MiniBrowser'" >> /home/seluser/.bashrc
+  && echo "alias l='ls -ltr'" >> /home/seluser/.bashrc
 
 COPY nginx.template.conf /etc/nginx/
 COPY nginx-service.conf /etc/supervisor/conf.d/
@@ -50,9 +49,6 @@ ENV HOME=/home/seluser
 RUN sudo chmod -R 777 /home/seluser \
   && sudo chgrp -R 0 /home/seluser \
   && sudo chmod -R g=u /home/seluser
-
-# Make sure WebKitWebDriver restarts if it crashes
-RUN sed -zi 's/\[program:webkit-webdriver].*autorestart=false/[program:webkit-webdriver]\npriority=15\ncommand=WebKitWebDriver -p 4444 --host=0.0.0.0\nautostart=true\nautorestart=true/' /etc/supervisor/conf.d/services.conf
 
 # Container image debugging tools
 # RUN apt-get install vim telnet procps -y \
