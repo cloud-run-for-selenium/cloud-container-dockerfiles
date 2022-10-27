@@ -8,6 +8,15 @@ Heroku has a nice free plan with no credit card to get started, but Chrome and F
 
 To run on Heroku, we add an NGINX reverse proxy. The reverse proxy sends traffic meant for noVNC to the noVNC server on port 7900, and WebKitWebDriver traffic to port 4444.  The reverse proxy listens publicly on the port exposed by the container-based platform.
 
+### Build webkitwebdriver-epiphany-cloud
+
+```
+$ sh build-epiphany-image.sh
+```
+
+The image is built from Dockerfile.epiphany.nginx
+
+
 ### Security
 
 When running on Heroku, the container looks for the following environment variables set in the Heroku Config Vars:
