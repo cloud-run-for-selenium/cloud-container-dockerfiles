@@ -3,7 +3,7 @@
 # This allows you to run the image on cloud container platforms 
 # while still being able to run tests and watch them at the same time. 
 ###################################################################
-FROM jamesmortensen/webkitwebdriver-epiphany:20220617
+FROM jamesmortensen/webkitwebdriver-epiphany:latest
 
 USER root
 
