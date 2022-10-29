@@ -102,6 +102,7 @@ jobs:
               EPIPHANY_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "epiphany --version" | tail -n 1`
               echo "Epiphany: $EPIPHANY_VERSION" >> release_notes.md
           fi
+          docker run --rm $IMAGE_NAME:latest bash -c "nginx -v" >> release_notes.md
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           go install github.com/github-release/github-release@v0.10.0
           echo "Set release notes"
