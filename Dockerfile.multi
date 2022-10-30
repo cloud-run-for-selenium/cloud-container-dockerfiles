@@ -3,7 +3,8 @@
 # This allows you to run the image on cloud container platforms 
 # while still being able to run tests and watch them at the same time. 
 ###################################################################
-{{FROM}}
+ARG FROM
+FROM ${FROM}
 
 USER root
 
@@ -31,4 +32,4 @@ CMD if [ -n "$VNC_SECRET_PW" ]; then x11vnc -storepasswd $VNC_SECRET_PW /home/se
   # Start NGINX and other services
   && /opt/bin/entry_point.sh
 
-EXPOSE $PORT
+#EXPOSE $PORT

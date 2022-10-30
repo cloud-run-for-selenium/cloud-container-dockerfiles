@@ -62,11 +62,10 @@ Once added, you'll see the noVNC client when visiting YOUR_APP.herokuapp.com
 
 The Selenium organization maintains [docker-selenium](https://github.com/SeleniumHQ/docker-selenium) images which contain a Selenium server, WebDriver, and a web browser. These images can also be run on Google Cloud Run and other platforms, but if the platform only supports one open public port, then we need a way to route traffic to those services through a single port. This can be accomplished with reverse proxies, such as NGINX or Caddy.
 
-When running on Google Cloud Run or Heroku, the image needs the NGINX proxy installed in order to forward traffic from the open port to services listening on internal local ports. Run these commands to generate the Dockerfile and build the image for Chrome:
+When running on Google Cloud Run or Heroku, the image needs the NGINX proxy installed in order to forward traffic from the open port to services listening on internal local ports. Run these commands to build the image for Chrome:
 
 ```
-$ sh docker-build-image.sh amd64 chrome jamesmortensen/standalone-chrome-cloud:latest
-$ docker build -t jamesmortensen/standalone-chrome-cloud:latest .
+$ sh docker-build-image.sh amd64 chrome jamesmortensen/standalone-chrome-cloud-amd64:latest
 ```
 
 
@@ -76,7 +75,6 @@ In some cases you may want to deploy to a non x86_64 cloud platform, or even jus
 
 ```
 $ sh docker-build-image.sh arm64 chromium jamesmortensen/standalone-chromium-cloud-arm64:latest
-$ docker build -t jamesmortensen/standalone-chromium-cloud-arm64:latest .
 ```
 
 Heroku and Cloud Run don't support arm at this time, but this helps solve building for other platforms which do.
@@ -88,7 +86,7 @@ The exposed public PORT is set at runtime, usually by the cloud platform provide
 The containers are designed to be run securely, so we also need to set an ACCESS_TOKEN. Optionally, we can change the VNC password by setting the VNC_SECRET_PW environment variable. By default, it's just "secret". Below is an example command to run the Chrome Cloud Container locally:
 
 ```
-$ docker run --rm -it -p 8080:8080 --shm-size 3g -e PORT=8080 -e ACCESS_TOKEN=abcde jamesmortensen/standalone-chrome-cloud:latest
+$ docker run --rm -it -p 8080:8080 --shm-size 3g -e PORT=8080 -e ACCESS_TOKEN=abcde jamesmortensen/standalone-chrome-cloud-amd64:latest
 ```
 
 Be sure to create a profile in ModHeaders extension in order to pass the ACCESS_TOKEN via the Authorization header by entering "Bearer ${ACCESS_TOKEN}" and replacing ${ACCESS_TOKEN} with the actual token. ("abcde" in the above example).
