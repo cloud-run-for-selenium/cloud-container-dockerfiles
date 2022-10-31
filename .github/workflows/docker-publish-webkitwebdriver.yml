@@ -7,7 +7,7 @@ name: Publish webkitwebdriver
 
 on:
   push:
-    branches: [ "master", "docker-publish-webkitwebdriver" ]
+    branches: [ "master" ]
     # Publish semver tags as releases.
     tags: [ '*' ]
   pull_request:
