@@ -24,6 +24,10 @@ fi
 if [ "$ARCH" = "amd64" ]; then
     if [ "$BASE" = "chrome" ]; then
         FROM_ENTRY="selenium/standalone-chrome:latest"
+    elif [ "$BASE" = "firefox" ]; then
+        FROM_ENTRY="selenium/standalone-firefox:latest"
+    elif [ "$BASE" = "edge" ]; then
+        FROM_ENTRY="selenium/standalone-edge:latest"
     elif [ "$BASE" = "epiphany" ]; then
         FROM_ENTRY="jamesmortensen/webkitwebdriver-epiphany:latest"
     elif [ "$BASE" = "minibrowser" ]; then
@@ -33,6 +37,11 @@ if [ "$ARCH" = "amd64" ]; then
 elif [ "$ARCH" = "arm64" ]; then
     if [ "$BASE" = "chromium" ]; then
         FROM_ENTRY="seleniarm/standalone-chromium:latest"
+    elif [ "$BASE" = "firefox" ]; then
+        FROM_ENTRY="seleniarm/standalone-firefox:latest"
+    elif [ "$BASE" = "edge" ]; then
+        echo "There is no Microsoft Edge built for Linux arm64."
+        exit 1;
     elif [ "$BASE" = "epiphany" ]; then
         FROM_ENTRY="jamesmortensen/webkitwebdriver-epiphany:latest"
     elif [ "$BASE" = "minibrowser" ]; then
@@ -52,5 +61,9 @@ else
 fi
 
 
-# docker buildx build --platform linux/$1 -f Dockerfile.multi --build-arg FROM=$FROM_ENTRY -t $TAG .
-podman build -f Dockerfile.multi --build-arg FROM=$FROM_ENTRY -t $TAG .
+docker buildx build --platform linux/$1 -f Dockerfile.multi $PUSH_ARG --build-arg FROM=$FROM_ENTRY -t $TAG .
+# podman build -f Dockerfile.multi --build-arg FROM=$FROM_ENTRY -t $TAG .
+
+if [ -n "$GITHUB_ENV" ]; then
+   echo "IMAGE_NAME=$TAG" >> $GITHUB_ENV
+fi
