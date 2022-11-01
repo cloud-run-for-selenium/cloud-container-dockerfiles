@@ -22,8 +22,43 @@ env:
 
 
 jobs:
-  push-to-docker-hub:
+  # build-matrix:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - id: set-matrix
+  #       run: |
+  #         echo "browser=['firefox']" >> $GITHUB_OUTPUT
+  #         echo "arch=['amd64','arm64']" >> $GITHUB_OUTPUT
+  #   outputs:
+  #     browser: ${{ steps.set-matrix.outputs.browser }}
+  #     arch: ${{ steps.set-matrix.outputs.arch }}
+  prepare-draft-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    steps:
+      - name: Prepare draft 
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG=$(date +'%Y%m%d')-selenium-cloud-containers
+          git tag v$RELEASE_TAG
+          git push origin v$RELEASE_TAG
+          echo "Selenium Cloud Container browser images are published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
+          echo "" >> release_notes.md
+          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          go install github.com/github-release/github-release@v0.10.0
+          echo "Set release notes"
+          ~/go/bin/github-release release --draft -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
 
+
+  push-to-docker-hub:
+    needs: prepare-draft-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -33,15 +68,21 @@ jobs:
       id-token: write
     strategy:
       matrix:
+        # browser: ${{ fromJson(needs.build-matrix.outputs.browser }}
+        # arch: ${{ fromJson(needs.build-matrix.outputs.arch }}
         browser: [ firefox ]
         arch: [ amd64, arm64 ]
         include:
-          # - browser: edge 
-          #   arch: amd64
+          - browser: edge 
+            arch: amd64
           - browser: chrome
             arch: amd64
           - browser: chromium
             arch: arm64
+    env:
+      ARCH: ${{ matrix.arch }}
+      BROWSER: ${{ matrix.browser }}
+      IMAGE_NAME: jamesmortensen/standalone-${{ matrix.browser }}-cloud-${{ matrix.arch }}
 
     steps:
       - name: Checkout repository
@@ -89,9 +130,9 @@ jobs:
       #     platforms: linux/amd64,linux/arm64
       - name: Build and push Docker image with Buildx (don't push on PR)
         id: build-and-push
-        env:
-          ARCH: ${{ matrix.arch }}
-          BROWSER: ${{ matrix.browser }}
+        # env:
+        #   ARCH: ${{ matrix.arch }}
+        #   BROWSER: ${{ matrix.browser }}
         run: |
           PUSH_ARG="${{ github.event_name != 'pull_request' }}"
           sh docker-build-image.sh $ARCH $BROWSER
@@ -107,26 +148,84 @@ jobs:
       - name: Check release tag
         run: echo ${{ steps.tagging.outputs.release_tag }}
 
-      # - name: Publish release
-      #   if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     RELEASE_TAG: ${{ steps.tagging.outputs.release_tag }}
-      #   run: |
-      #     git tag v$RELEASE_TAG
-      #     git push origin v$RELEASE_TAG
-      #     echo "$RELEASE_TAG is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
-      #     echo "" >> release_notes.md
-      #     MINIBROWSER_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "cd /opt/bin && bash entry_point.sh & sleep 5 && /usr/lib/*-linux-gnu/webkit2gtk-4.0/MiniBrowser --version" | tail -n 1`
-      #     echo "MiniBrowser: $MINIBROWSER_VERSION" >> release_notes.md
-      #     echo "WebKitWebDriver: $MINIBROWSER_VERSION" >> release_notes.md
-      #     if echo "$IMAGE_NAME" | grep -q "epiphany"; then
-      #         EPIPHANY_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "epiphany --version" | tail -n 1`
-      #         echo "Epiphany: $EPIPHANY_VERSION" >> release_notes.md
-      #     fi
-      #     NGINX_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "nginx -v" | tail -n 1`
-      #     echo $NGINX_VERSION >> release_notes.md
-      #     REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-      #     go install github.com/github-release/github-release@v0.10.0
-      #     echo "Set release notes"
-      #     ~/go/bin/github-release release -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
+      - name: Prepare Draft Release
+        if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BROWSER: ${{ matrix.browser }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          RELEASE_TAG=$(date +'%Y%m%d')-selenium-$BROWSER-$ARCH-cloud
+          git tag v$RELEASE_TAG
+          git push origin v$RELEASE_TAG
+          echo "* standalone-$BROWSER-$ARCH-cloud is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
+          echo "" >> release_notes.md
+
+          if [ "$BROWSER" = "firefox" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/geckodriver --version | head -n 1"
+            export BROWSER_VERSION_COMMAND="firefox -version"
+          elif [ "$BROWSER" = "chrome" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/chromedriver -version"
+            export BROWSER_VERSION_COMMAND="google-chrome -version"
+          elif [ "$BROWSER" = "chromium" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/chromedriver -version"
+            export BROWSER_VERSION_COMMAND="/usr/bin/chromium -version"
+          elif [ "$BROWSER" = "edge" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/msedgedriver -version"
+            export BROWSER_VERSION_COMMAND="microsoft-edge -version"
+          fi
+          
+          BROWSER_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "$BROWSER_VERSION_COMMAND" | tail -n 1`
+          DRIVER_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "$DRIVER_VERSION_COMMAND" | tail -n 1`
+          echo "  + $BROWSER: $BROWSER_VERSION" >> release_notes.md
+          echo "  + $BROWSER WebDriver: $MINIBROWSER_VERSION" >> release_notes.md
+          NGINX_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "nginx -v" | tail -n 1`
+          echo $NGINX_VERSION >> release_notes.md
+          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          go install github.com/github-release/github-release@v0.10.0
+          echo "Get draft release notes"
+          DRAFT_RELEASE_TAG=$(date +'%Y%m%d')-selenium-cloud-containers
+          github-release info -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag $DRAFT_RELEASE_TAG -j > draft-release.json
+          node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
+          echo "Set release notes"
+          cat release_notes.md >> draft_release_notes.md
+          ~/go/bin/github-release edit -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat draft_release_notes.md`"
+
+    
+    outputs:
+      release_tag: ${{ steps.tagging.outputs.release_tag }}
+
+  publish-release-notes:
+    needs: push-to-docker-hub
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    
+    steps:
+      - name: Publish release
+        if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.push-to-docker-hub.outputs.release_tag }}needs.build-matrix.outputs.arch
+        run: |
+          git tag v$RELEASE_TAG
+          git push origin v$RELEASE_TAG
+          echo "$RELEASE_TAG is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
+          echo "" >> release_notes.md
+          MINIBROWSER_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "cd /opt/bin && bash entry_point.sh & sleep 5 && /usr/lib/*-linux-gnu/webkit2gtk-4.0/MiniBrowser --version" | tail -n 1`
+          echo "MiniBrowser: $MINIBROWSER_VERSION" >> release_notes.md
+          echo "WebKitWebDriver: $MINIBROWSER_VERSION" >> release_notes.md
+          if echo "$IMAGE_NAME" | grep -q "epiphany"; then
+              EPIPHANY_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "epiphany --version" | tail -n 1`
+              echo "Epiphany: $EPIPHANY_VERSION" >> release_notes.md
+          fi
+          NGINX_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "nginx -v" | tail -n 1`
+          echo $NGINX_VERSION >> release_notes.md
+          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          go install github.com/github-release/github-release@v0.10.0
+          echo "Set release notes"
+          ~/go/bin/github-release release -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
