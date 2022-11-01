@@ -177,13 +177,13 @@ jobs:
             export DRIVER_VERSION_COMMAND="/usr/bin/msedgedriver -version"
             export BROWSER_VERSION_COMMAND="microsoft-edge -version"
           fi
-          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$BROWSER_VERSION_COMMAND"
-          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$DRIVER_VERSION_COMMAND"
-          BROWSER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$BROWSER_VERSION_COMMAND"`
-          DRIVER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$DRIVER_VERSION_COMMAND"`
+          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$BROWSER_VERSION_COMMAND"
+          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$DRIVER_VERSION_COMMAND"
+          BROWSER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$BROWSER_VERSION_COMMAND"`
+          DRIVER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$DRIVER_VERSION_COMMAND"`
           echo "  + $BROWSER: $BROWSER_VERSION" >> release_notes.md
-          echo "  + $BROWSER WebDriver: $MINIBROWSER_VERSION" >> release_notes.md
-          NGINX_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "nginx -v" | tail -n 1`
+          echo "  + $BROWSER WebDriver: $DRIVER_VERSION" >> release_notes.md
+          NGINX_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "nginx -v" | tail -n 1`
           echo $NGINX_VERSION >> release_notes.md
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           go install github.com/github-release/github-release@v0.10.0
