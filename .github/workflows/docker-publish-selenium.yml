@@ -177,9 +177,10 @@ jobs:
             export DRIVER_VERSION_COMMAND="/usr/bin/msedgedriver -version"
             export BROWSER_VERSION_COMMAND="microsoft-edge -version"
           fi
-          
-          BROWSER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$BROWSER_VERSION_COMMAND" | tail -n 1`
-          DRIVER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$DRIVER_VERSION_COMMAND" | tail -n 1`
+          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$BROWSER_VERSION_COMMAND"
+          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$DRIVER_VERSION_COMMAND"
+          BROWSER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$BROWSER_VERSION_COMMAND"`
+          DRIVER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "$DRIVER_VERSION_COMMAND"`
           echo "  + $BROWSER: $BROWSER_VERSION" >> release_notes.md
           echo "  + $BROWSER WebDriver: $MINIBROWSER_VERSION" >> release_notes.md
           NGINX_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME:latest bash -c "nginx -v" | tail -n 1`
