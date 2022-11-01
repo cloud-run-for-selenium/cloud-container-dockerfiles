@@ -69,6 +69,7 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
     strategy:
+      fail-fast: false
       matrix:
         # browser: ${{ fromJson(needs.build-matrix.outputs.browser }}
         # arch: ${{ fromJson(needs.build-matrix.outputs.arch }}
