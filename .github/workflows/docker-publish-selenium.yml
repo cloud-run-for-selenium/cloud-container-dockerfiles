@@ -188,7 +188,7 @@ jobs:
           go install github.com/github-release/github-release@v0.10.0
           echo "Get draft release notes"
           DRAFT_RELEASE_TAG=$(date +'%Y%m%d')-selenium-cloud-containers
-          ~/go/bin/github-release info -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag $DRAFT_RELEASE_TAG -j > draft-release.json
+          ~/go/bin/github-release info -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$DRAFT_RELEASE_TAG -j > draft-release.json
           node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
           echo "Set release notes"
           cat release_notes.md >> draft_release_notes.md
