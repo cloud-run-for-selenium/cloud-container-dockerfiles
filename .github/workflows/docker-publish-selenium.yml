@@ -133,11 +133,13 @@ jobs:
       #     platforms: linux/amd64,linux/arm64
       - name: Build and push Docker image with Buildx (don't push on PR)
         id: build-and-push
-        # env:
+        env:
+          SHOULD_PUSH: ${{ github.event_name != 'pull_request' }}
         #   ARCH: ${{ matrix.arch }}
         #   BROWSER: ${{ matrix.browser }}
         run: |
-          PUSH_ARG="${{ github.event_name != 'pull_request' }}"
+          if [ "$SHOULD_PUSH" = "true" ]; then
+            export PUSH_ARG="--push"
           sh docker-build-image.sh $ARCH $BROWSER
 
       - name: Create Tags
