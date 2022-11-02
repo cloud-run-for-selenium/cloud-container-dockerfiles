@@ -1,4 +1,4 @@
-name: Publish Selenium
+name: Publish Selenium Cloud Containers
 
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
@@ -44,20 +44,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Prepare draft 
+        id: prepare-draft
         if: ${{ github.event_name != 'pull_request' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_TAG=$(date +'%Y%m%d')-selenium-cloud-containers
+          BUILD_DATE=$(date +'%Y%m%d')
+          RELEASE_TAG=$BUILD_DATE-selenium-cloud-containers
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
           git tag v$RELEASE_TAG
           git push origin v$RELEASE_TAG
-          echo "Selenium Cloud Container browser images are published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
+          echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
           echo "" >> release_notes.md
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           go install github.com/github-release/github-release@v0.10.0
           echo "Set release notes"
           ~/go/bin/github-release release --draft -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
-
+    outputs:
+      release_tag: ${{ steps.outputs.prepare-draft.release_tag }}
+      build_date: ${{ steps.outputs.prepare-draft.build_date }}
 
   push-to-docker-hub:
     needs: prepare-draft-release
@@ -110,46 +116,31 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
-      # - name: Extract Docker metadata
-      #   id: meta
-      #   uses: docker/metadata-action@v4
-      #   with:
-      #     images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      # Build and push Docker image with Buildx (don't push on PR)
-      # https://github.com/docker/build-push-action
-      # - name: Build and push Docker image
-      #   id: build-and-push
-      #   uses: docker/build-push-action@v3
-      #   with:
-      #     context: .
-      #     file: Dockerfile.epiphany.nginx
-      #     push: ${{ github.event_name != 'pull_request' }}
-      #     #tags: ${{ steps.meta.outputs.tags }}
-      #     tags: ${{ steps.tagging.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     platforms: linux/amd64,linux/arm64
       - name: Build and push Docker image with Buildx (don't push on PR)
         id: build-and-push
         env:
           SHOULD_PUSH: ${{ github.event_name != 'pull_request' }}
-        #   ARCH: ${{ matrix.arch }}
-        #   BROWSER: ${{ matrix.browser }}
         run: |
           if [ "$SHOULD_PUSH" = "true" ]; then
             export PUSH_ARG="--push"
           fi
           sh docker-build-image.sh $ARCH $BROWSER
 
-      - name: Create Tags
+      - name: Create Tags and Outputs
         id: tagging
         run: |
-          BUILD_DATE=$(date +'%Y%m%d')
+          BUILD_DATE=${{ needs.prepare-draft-release.outputs.build_date }}
+          echo BUILD_DATE is $BUILD_DATE
+          echo IMAGE_NAME is $IMAGE_NAME
+          echo "DRAFT_RELEASE_TAG=${{ needs.prepare-draft-release.outputs.release_tag }}" >> $GITHUB_ENV
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
           echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$BUILD_DATE,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_OUTPUT
           IMAGE=`echo $IMAGE_NAME | sed 's/.*\///g'`
-          echo "release_tag=$BUILD_DATE-$IMAGE" >> $GITHUB_OUTPUT
+          echo IMAGE is $IMAGE
+          echo container_release_tag is $BUILD_DATE-$IMAGE
+          echo release_tag is ${{ needs.prepare-draft-release.outputs.release_tag }}
+          echo "container_release_tag=$BUILD_DATE-$IMAGE" >> $GITHUB_OUTPUT
+          echo "release_tag=${{ needs.prepare-draft-release.outputs.release_tag }}" >> $GITHUB_OUTPUT
       
       - name: Check release tag
         run: echo ${{ steps.tagging.outputs.release_tag }}
@@ -161,9 +152,10 @@ jobs:
           BROWSER: ${{ matrix.browser }}
           ARCH: ${{ matrix.arch }}
         run: |
-          RELEASE_TAG=$(date +'%Y%m%d')-selenium-$BROWSER-$ARCH-cloud
-          git tag v$RELEASE_TAG
-          git push origin v$RELEASE_TAG
+          CONTAINER_RELEASE_TAG=$BUILD_DATE-selenium-$BROWSER-$ARCH-cloud
+          echo CONTAINER_RELEASE_TAG is $CONTAINER_RELEASE_TAG
+          git tag v$CONTAINER_RELEASE_TAG
+          git push origin v$CONTAINER_RELEASE_TAG
           echo "* standalone-$BROWSER-$ARCH-cloud is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
           echo "" >> release_notes.md
 
@@ -191,15 +183,15 @@ jobs:
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           go install github.com/github-release/github-release@v0.10.0
           echo "Get draft release notes"
-          DRAFT_RELEASE_TAG=$(date +'%Y%m%d')-selenium-cloud-containers
+          #DRAFT_RELEASE_TAG=$(date +'%Y%m%d')-selenium-cloud-containers
           ~/go/bin/github-release info -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$DRAFT_RELEASE_TAG -j > draft-release.json
           node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
           echo "Set release notes"
           cat release_notes.md >> draft_release_notes.md
-          ~/go/bin/github-release edit -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat draft_release_notes.md`"
+          ~/go/bin/github-release edit -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$DRAFT_RELEASE_TAG --name $RELEASE_TAG --description "`cat draft_release_notes.md`"
 
-    
     outputs:
+      container_release_tag: ${{ steps.tagging.outputs.container_release_tag }}
       release_tag: ${{ steps.tagging.outputs.release_tag }}
 
   publish-release-notes:
