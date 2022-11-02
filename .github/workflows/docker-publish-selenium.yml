@@ -62,8 +62,8 @@ jobs:
           echo "Set release notes"
           ~/go/bin/github-release release --draft -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
     outputs:
-      release_tag: ${{ steps.outputs.prepare-draft.release_tag }}
-      build_date: ${{ steps.outputs.prepare-draft.build_date }}
+      release_tag: ${{ steps.prepare-draft.outputs.release_tag }}
+      build_date: ${{ steps.prepare-draft.outputs.build_date }}
 
   push-to-docker-hub:
     needs: prepare-draft-release
