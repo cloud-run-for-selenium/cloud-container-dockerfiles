@@ -188,7 +188,7 @@ jobs:
           node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
           echo "Set release notes"
           cat release_notes.md >> draft_release_notes.md
-          ~/go/bin/github-release edit -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$DRAFT_RELEASE_TAG --name $RELEASE_TAG --description "`cat draft_release_notes.md`"
+          ~/go/bin/github-release edit -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$DRAFT_RELEASE_TAG --description "`cat draft_release_notes.md`"
 
     outputs:
       container_release_tag: ${{ steps.tagging.outputs.container_release_tag }}
