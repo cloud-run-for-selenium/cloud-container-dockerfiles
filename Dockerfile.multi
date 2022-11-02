@@ -23,6 +23,8 @@ COPY nginx-service.conf /etc/supervisor/conf.d/
 #  && apt-get clean \
 #  && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
+USER seluser
+
 # Set VNC password at runtime, from the Heroku config vars, and clear it from the environment.
 CMD if [ -n "$VNC_SECRET_PW" ]; then x11vnc -storepasswd $VNC_SECRET_PW /home/seluser/.vnc/passwd; unset VNC_SECRET_PW; fi \
   # Replaces the {{PORT}} template variable in the NGINX config with the platform assigned port
@@ -32,4 +34,4 @@ CMD if [ -n "$VNC_SECRET_PW" ]; then x11vnc -storepasswd $VNC_SECRET_PW /home/se
   # Start NGINX and other services
   && /opt/bin/entry_point.sh
 
-#EXPOSE $PORT
+EXPOSE $PORT

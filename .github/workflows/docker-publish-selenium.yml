@@ -146,16 +146,13 @@ jobs:
         run: echo ${{ steps.tagging.outputs.release_tag }}
 
       - name: Prepare Draft Release
+        id: prepare-release
         if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BROWSER: ${{ matrix.browser }}
           ARCH: ${{ matrix.arch }}
         run: |
-          CONTAINER_RELEASE_TAG=$BUILD_DATE-selenium-$BROWSER-$ARCH-cloud
-          echo CONTAINER_RELEASE_TAG is $CONTAINER_RELEASE_TAG
-          git tag v$CONTAINER_RELEASE_TAG
-          git push origin v$CONTAINER_RELEASE_TAG
           echo "* standalone-$BROWSER-$ARCH-cloud is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
           echo "" >> release_notes.md
 
@@ -176,8 +173,8 @@ jobs:
           echo docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$DRIVER_VERSION_COMMAND"
           BROWSER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$BROWSER_VERSION_COMMAND"`
           DRIVER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$DRIVER_VERSION_COMMAND"`
-          echo "  + $BROWSER: $BROWSER_VERSION" >> release_notes.md
-          echo "  + $BROWSER WebDriver: $DRIVER_VERSION" >> release_notes.md
+          echo "  + $BROWSER_VERSION" >> release_notes.md
+          echo "  + WebDriver: $DRIVER_VERSION" >> release_notes.md
           NGINX_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "nginx -v" | tail -n 1`
           echo $NGINX_VERSION >> release_notes.md
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
@@ -188,13 +185,21 @@ jobs:
           node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
           echo "Set release notes"
           cat release_notes.md >> draft_release_notes.md
+          cat draft_release_notes.md
           ~/go/bin/github-release edit -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$DRAFT_RELEASE_TAG --description "`cat draft_release_notes.md`"
+          CONTAINER_RELEASE_TAG=$BUILD_DATE-selenium-$BROWSER-$ARCH-cloud
+          echo CONTAINER_RELEASE_TAG is $CONTAINER_RELEASE_TAG
+          git tag v$CONTAINER_RELEASE_TAG
+          git push origin v$CONTAINER_RELEASE_TAG
+          echo "success=true" >> $GITHUB_OUTPUT
 
     outputs:
       container_release_tag: ${{ steps.tagging.outputs.container_release_tag }}
       release_tag: ${{ steps.tagging.outputs.release_tag }}
+      success: ${{ steps.prepare-release.outputs.success }}
 
   publish-release-notes:
+    if: always() && needs.push-to-docker-hub.outputs.success == 'true'
     needs: push-to-docker-hub
     runs-on: ubuntu-latest
     permissions:
@@ -215,3 +220,6 @@ jobs:
           go install github.com/github-release/github-release@v0.10.0
           echo "Publish the release"
           ~/go/bin/github-release release -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
+          echo "release notes published:"
+          cat release_notes.md
+          
