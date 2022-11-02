@@ -140,6 +140,7 @@ jobs:
         run: |
           if [ "$SHOULD_PUSH" = "true" ]; then
             export PUSH_ARG="--push"
+          fi
           sh docker-build-image.sh $ARCH $BROWSER
 
       - name: Create Tags
