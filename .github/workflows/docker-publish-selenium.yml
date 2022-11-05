@@ -218,8 +218,9 @@ jobs:
         run: |
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           go install github.com/github-release/github-release@v0.10.0
+          ~/go/bin/github-release info -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG -j > draft-release.json
+          node .github/workflows/bin/get-release-notes.js > release_notes.md
           echo "Publish the release"
           ~/go/bin/github-release release -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
           echo "release notes published:"
           cat release_notes.md
-          
