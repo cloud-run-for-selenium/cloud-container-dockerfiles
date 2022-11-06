@@ -45,6 +45,8 @@ jobs:
         uses: actions/checkout@v3
       - name: Remove tags for today
         continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           BUILD_DATE=$(date +'%Y%m%d')
@@ -55,11 +57,16 @@ jobs:
           echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
 
           go install github.com/github-release/github-release@v0.10.0
-          echo "Remove old releases for today:"
+          echo "Remove old releases for today for v$RELEASE_TAG"
           ~/go/bin/github-release delete \
             -u $GITHUB_REPOSITORY_OWNER \
             -r $REPO \
             --tag v$RELEASE_TAG
+      - name: Remove old tag
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           echo "Remove tag for old release today:"
           git push origin --delete v$RELEASE_TAG
           
