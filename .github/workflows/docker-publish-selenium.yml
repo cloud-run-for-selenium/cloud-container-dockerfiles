@@ -55,10 +55,12 @@ jobs:
           echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
 
           go install github.com/github-release/github-release@v0.10.0
+          echo "Remove old releases for today:"
           ~/go/bin/github-release delete \
             -u $GITHUB_REPOSITORY_OWNER \
             -r $REPO \
             --tag v$RELEASE_TAG
+          echo "Remove tag for old release today:"
           git push origin --delete v$RELEASE_TAG
           
       - name: Prepare draft 
