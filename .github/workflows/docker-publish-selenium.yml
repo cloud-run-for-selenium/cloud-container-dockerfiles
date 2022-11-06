@@ -43,6 +43,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      - name: Remove tags for today
+        continue-on-error: true
+        run: |
+          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          BUILD_DATE=$(date +'%Y%m%d')
+          RELEASE_TAG=$BUILD_DATE-selenium-cloud-containers
+
+          echo "REPO=$REPO" >> $GITHUB_ENV
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
+          go install github.com/github-release/github-release@v0.10.0
+          ~/go/bin/github-release delete -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
+          git push origin --delete v$RELEASE_TAG
+          
       - name: Prepare draft 
         id: prepare-draft
         if: ${{ github.event_name != 'pull_request' }}
@@ -58,7 +73,6 @@ jobs:
           echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
           echo "" >> release_notes.md
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-          go install github.com/github-release/github-release@v0.10.0
           echo "Set release notes"
           ~/go/bin/github-release release --draft -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
     outputs:
@@ -189,8 +203,8 @@ jobs:
           ~/go/bin/github-release edit -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$DRAFT_RELEASE_TAG --description "`cat draft_release_notes.md`"
           CONTAINER_RELEASE_TAG=$BUILD_DATE-selenium-$BROWSER-$ARCH-cloud
           echo CONTAINER_RELEASE_TAG is $CONTAINER_RELEASE_TAG
-          git tag v$CONTAINER_RELEASE_TAG
-          git push origin v$CONTAINER_RELEASE_TAG
+          #git tag v$CONTAINER_RELEASE_TAG
+          #git push origin v$CONTAINER_RELEASE_TAG
           echo "success=true" >> $GITHUB_OUTPUT
 
     outputs:
@@ -210,6 +224,8 @@ jobs:
       id-token: write
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
       - name: Publish release
         if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
         env:
