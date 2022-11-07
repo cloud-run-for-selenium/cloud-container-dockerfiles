@@ -20,7 +20,7 @@ env:
   REGISTRY: 'docker.io'
 
 jobs:
-  prepare-draft-release:
+  prepare:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -60,30 +60,28 @@ jobs:
           echo "Remove tag for old release today:"
           git push origin --delete v$RELEASE_TAG
           
-      - name: Prepare draft 
+      - name: Set build_date and release_tag 
         id: prepare-draft
         if: ${{ github.event_name != 'pull_request' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BUILD_DATE=$(date +'%Y%m%d')
-          RELEASE_TAG=$BUILD_DATE-selenium-cloud-containers
           echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          git tag v$RELEASE_TAG
-          git push origin v$RELEASE_TAG
+          # git tag v$RELEASE_TAG
+          # git push origin v$RELEASE_TAG
 
-          echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
-          echo "" >> release_notes.md
-          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-          echo "Set release notes"
-          ~/go/bin/github-release release \
-            --pre-release \
-            -u $GITHUB_REPOSITORY_OWNER \
-            -r $REPO \
-            --tag v$RELEASE_TAG \
-            --name $RELEASE_TAG \
-            --description "`cat release_notes.md`"
+          # echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
+          # echo "" >> release_notes.md
+          # REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          # echo "Set release notes"
+          # ~/go/bin/github-release release \
+          #   --pre-release \
+          #   -u $GITHUB_REPOSITORY_OWNER \
+          #   -r $REPO \
+          #   --tag v$RELEASE_TAG \
+          #   --name $RELEASE_TAG \
+          #   --description "`cat release_notes.md`"
 
     outputs:
       release_tag: ${{ steps.prepare-draft.outputs.release_tag }}
@@ -91,7 +89,7 @@ jobs:
 
 
   push-to-docker-hub:
-    needs: prepare-draft-release
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -115,7 +113,7 @@ jobs:
       ARCH: ${{ matrix.arch }}
       BROWSER: ${{ matrix.browser }}
       IMAGE_NAME: jamesmortensen/standalone-${{ matrix.browser }}-cloud-${{ matrix.arch }}
-      BUILD_DATE: ${{ needs.prepare-draft-release.outputs.build_date }}
+      BUILD_DATE: ${{ needs.prepare.outputs.build_date }}
 
     steps:
       - name: Checkout repository
@@ -155,19 +153,19 @@ jobs:
         run: |
           echo BUILD_DATE is $BUILD_DATE
           echo IMAGE_NAME is $IMAGE_NAME
-          echo "DRAFT_RELEASE_TAG=${{ needs.prepare-draft-release.outputs.release_tag }}" >> $GITHUB_ENV
+          echo "DRAFT_RELEASE_TAG=${{ needs.prepare.outputs.release_tag }}" >> $GITHUB_ENV
           echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$BUILD_DATE,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_OUTPUT
           IMAGE=`echo $IMAGE_NAME | sed 's/.*\///g'`
           echo IMAGE is $IMAGE
           echo container_release_tag is $BUILD_DATE-$IMAGE
-          echo release_tag is ${{ needs.prepare-draft-release.outputs.release_tag }}
+          echo release_tag is ${{ needs.prepare.outputs.release_tag }}
           echo "container_release_tag=$BUILD_DATE-$IMAGE" >> $GITHUB_OUTPUT
-          echo "release_tag=${{ needs.prepare-draft-release.outputs.release_tag }}" >> $GITHUB_OUTPUT
+          echo "release_tag=${{ needs.prepare.outputs.release_tag }}" >> $GITHUB_OUTPUT
       
       - name: Check release tag
         run: echo ${{ steps.tagging.outputs.release_tag }}
 
-      - name: Prepare Draft Release
+      - name: Prepare Release Notes
         id: prepare-release
         if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
         env:
@@ -205,72 +203,85 @@ jobs:
           NGINX_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "nginx -v" | tail -n 1`
           echo $NGINX_VERSION >> release_notes.md
 
-          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-          go install github.com/github-release/github-release@v0.10.0
-          echo "Get draft release notes"
+          # REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          # go install github.com/github-release/github-release@v0.10.0
+          # echo "Get draft release notes"
 
-          ~/go/bin/github-release info \
-            -u $GITHUB_REPOSITORY_OWNER \
-            -r $REPO \
-            --tag v$DRAFT_RELEASE_TAG \
-            -j > draft-release.json
+          # ~/go/bin/github-release info \
+          #   -u $GITHUB_REPOSITORY_OWNER \
+          #   -r $REPO \
+          #   --tag v$DRAFT_RELEASE_TAG \
+          #   -j > draft-release.json
 
-          node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
-          echo "Set release notes"
-          cat release_notes.md >> draft_release_notes.md
-          cat draft_release_notes.md
+          # node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
+          # echo "Set release notes"
+          # cat release_notes.md >> draft_release_notes.md
+          # cat draft_release_notes.md
 
-          ~/go/bin/github-release edit \
-            -u $GITHUB_REPOSITORY_OWNER \
-            -r $REPO \
-            --tag v$DRAFT_RELEASE_TAG \
-            --description "`cat draft_release_notes.md`"
+          # ~/go/bin/github-release edit \
+          #   -u $GITHUB_REPOSITORY_OWNER \
+          #   -r $REPO \
+          #   --tag v$DRAFT_RELEASE_TAG \
+          #   --description "`cat draft_release_notes.md`"
 
           #CONTAINER_RELEASE_TAG=$BUILD_DATE-selenium-$BROWSER-$ARCH-cloud
           #echo CONTAINER_RELEASE_TAG is $CONTAINER_RELEASE_TAG
           #git tag v$CONTAINER_RELEASE_TAG
           #git push origin v$CONTAINER_RELEASE_TAG
           echo "success=true" >> $GITHUB_OUTPUT
+      
+      - name: Upload artifact release_notes.md
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.BROWSER }}-${{ env.ARCH }}-release_notes.md
+          path: |
+            release_notes.md
 
     outputs:
       container_release_tag: ${{ steps.tagging.outputs.container_release_tag }}
       release_tag: ${{ steps.tagging.outputs.release_tag }}
       success: ${{ steps.prepare-release.outputs.success }}
 
-  # publish-release-notes:
-  #   if: always() && needs.push-to-docker-hub.outputs.success == 'true'
-  #   needs: push-to-docker-hub
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: write
-  #     packages: write
-  #     # This is used to complete the identity challenge
-  #     # with sigstore/fulcio when running outside of PRs.
-  #     id-token: write
+  publish-release-notes:
+    if: always() && needs.push-to-docker-hub.outputs.success == 'true'
+    needs: push-to-docker-hub
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
     
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v3
-  #     - name: Publish release
-  #       if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         RELEASE_TAG: ${{ needs.push-to-docker-hub.outputs.release_tag }}
-  #       run: |
-  #         REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-  #         go install github.com/github-release/github-release@v0.10.0
-  #         ~/go/bin/github-release info \
-  #           -u $GITHUB_REPOSITORY_OWNER \
-  #           -r $REPO \
-  #           --tag v$RELEASE_TAG \
-  #           -j > draft-release.json
-  #         node .github/workflows/bin/get-release-notes.js > release_notes.md
-  #         echo "Publish the release"
-  #         ~/go/bin/github-release edit \
-  #           -u $GITHUB_REPOSITORY_OWNER \
-  #           -r $REPO \
-  #           --tag v$RELEASE_TAG \
-  #           --name $RELEASE_TAG \
-  #           --description "`cat release_notes.md`"
-  #         echo "release notes published:"
-  #         cat release_notes.md
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          path: release-notes-artifacts
+      
+      - name: Publish release
+        if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.push-to-docker-hub.outputs.release_tag }}
+        run: |
+          git tag v$RELEASE_TAG
+          git push origin v$RELEASE_TAG
+          echo "Set release notes"
+          echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
+          echo "" >> release_notes.md
+          cat release_notes_artifacts/**/*.md >> release_notes.md
+          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          
+          echo "Publish the release:"
+          go install github.com/github-release/github-release@v0.10.0
+          ~/go/bin/github-release release \
+            -u $GITHUB_REPOSITORY_OWNER \
+            -r $REPO \
+            --tag v$RELEASE_TAG \
+            --name $RELEASE_TAG \
+            --description "`cat release_notes.md`"
+
+          echo "release notes published:"
+          cat release_notes.md
