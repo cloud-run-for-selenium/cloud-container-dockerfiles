@@ -115,6 +115,7 @@ jobs:
       ARCH: ${{ matrix.arch }}
       BROWSER: ${{ matrix.browser }}
       IMAGE_NAME: jamesmortensen/standalone-${{ matrix.browser }}-cloud-${{ matrix.arch }}
+      BUILD_DATE: ${{ needs.prepare-draft-release.outputs.build_date }}
 
     steps:
       - name: Checkout repository
@@ -152,11 +153,9 @@ jobs:
       - name: Create Tags and Outputs
         id: tagging
         run: |
-          BUILD_DATE=${{ needs.prepare-draft-release.outputs.build_date }}
           echo BUILD_DATE is $BUILD_DATE
           echo IMAGE_NAME is $IMAGE_NAME
           echo "DRAFT_RELEASE_TAG=${{ needs.prepare-draft-release.outputs.release_tag }}" >> $GITHUB_ENV
-          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
           echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$BUILD_DATE,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_OUTPUT
           IMAGE=`echo $IMAGE_NAME | sed 's/.*\///g'`
           echo IMAGE is $IMAGE
@@ -179,8 +178,11 @@ jobs:
           echo "* standalone-$BROWSER-$ARCH-cloud is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
           echo "" >> release_notes.md
 
-          if [ "$BROWSER" = "firefox" ]; then
+          if [ "$BROWSER" = "firefox" ] && [ "$ARCH" = "amd64" ]; then
             export DRIVER_VERSION_COMMAND="/usr/bin/geckodriver --version | head -n 1"
+            export BROWSER_VERSION_COMMAND="firefox -version"
+          elif [ "$BROWSER" = "firefox" ] && [ "$ARCH" = "arm64" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/local/bin/geckodriver --version | head -n 1"
             export BROWSER_VERSION_COMMAND="firefox -version"
           elif [ "$BROWSER" = "chrome" ]; then
             export DRIVER_VERSION_COMMAND="/usr/bin/chromedriver -version"

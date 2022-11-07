@@ -9,7 +9,6 @@ FROM ${FROM}
 USER root
 
 RUN sudo apt-get update -y && sudo apt-get install nginx --no-install-recommends -y \
-  && apt-get autoremove -y \ 
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
   && echo "alias l='ls -ltr'" >> /home/seluser/.bashrc
