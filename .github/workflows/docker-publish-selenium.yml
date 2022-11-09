@@ -7,7 +7,7 @@ name: Publish Selenium Cloud Containers
 
 on:
   push:
-    branches: [ "master", "selenium-workflows" ]
+    branches: [ "master" ]
     # Publish semver tags as releases.
     tags: [ '*' ]
   pull_request:
@@ -68,20 +68,6 @@ jobs:
         run: |
           echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          # git tag v$RELEASE_TAG
-          # git push origin v$RELEASE_TAG
-
-          # echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
-          # echo "" >> release_notes.md
-          # REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-          # echo "Set release notes"
-          # ~/go/bin/github-release release \
-          #   --pre-release \
-          #   -u $GITHUB_REPOSITORY_OWNER \
-          #   -r $REPO \
-          #   --tag v$RELEASE_TAG \
-          #   --name $RELEASE_TAG \
-          #   --description "`cat release_notes.md`"
 
     outputs:
       release_tag: ${{ steps.prepare-draft.outputs.release_tag }}
@@ -132,7 +118,7 @@ jobs:
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -202,32 +188,6 @@ jobs:
           echo "  + WebDriver: $DRIVER_VERSION" >> release_notes.md
           NGINX_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "nginx -v" | tail -n 1`
           echo $NGINX_VERSION >> release_notes.md
-
-          # REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-          # go install github.com/github-release/github-release@v0.10.0
-          # echo "Get draft release notes"
-
-          # ~/go/bin/github-release info \
-          #   -u $GITHUB_REPOSITORY_OWNER \
-          #   -r $REPO \
-          #   --tag v$DRAFT_RELEASE_TAG \
-          #   -j > draft-release.json
-
-          # node .github/workflows/bin/get-release-notes.js > draft_release_notes.md
-          # echo "Set release notes"
-          # cat release_notes.md >> draft_release_notes.md
-          # cat draft_release_notes.md
-
-          # ~/go/bin/github-release edit \
-          #   -u $GITHUB_REPOSITORY_OWNER \
-          #   -r $REPO \
-          #   --tag v$DRAFT_RELEASE_TAG \
-          #   --description "`cat draft_release_notes.md`"
-
-          #CONTAINER_RELEASE_TAG=$BUILD_DATE-selenium-$BROWSER-$ARCH-cloud
-          #echo CONTAINER_RELEASE_TAG is $CONTAINER_RELEASE_TAG
-          #git tag v$CONTAINER_RELEASE_TAG
-          #git push origin v$CONTAINER_RELEASE_TAG
           echo "success=true" >> $GITHUB_OUTPUT
       
       - name: Upload artifact release_notes.md
@@ -241,6 +201,7 @@ jobs:
       container_release_tag: ${{ steps.tagging.outputs.container_release_tag }}
       release_tag: ${{ steps.tagging.outputs.release_tag }}
       success: ${{ steps.prepare-release.outputs.success }}
+
 
   publish-release-notes:
     if: always() && needs.push-to-docker-hub.outputs.success == 'true'
@@ -271,8 +232,6 @@ jobs:
           echo "Set release notes"
           echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
           echo "" >> release_notes.md
-          ls -ltrSha release-notes-artifacts
-          ls -ltrSha release-notes-artifacts/chrome-amd64-release_notes.md/
           cat release-notes-artifacts/*.md/*.md >> release_notes.md
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           
