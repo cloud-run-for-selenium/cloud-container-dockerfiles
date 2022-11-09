@@ -273,7 +273,7 @@ jobs:
           echo "" >> release_notes.md
           ls -ltrSha release-notes-artifacts
           ls -ltrSha release-notes-artifacts/chrome-amd64-release_notes.md/
-          cat release-notes-artifacts/*.md >> release_notes.md
+          cat release-notes-artifacts/*.md/*.md >> release_notes.md
           REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
           
           echo "Publish the release:"
