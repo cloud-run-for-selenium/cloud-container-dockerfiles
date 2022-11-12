@@ -55,13 +55,19 @@ else
 fi
 
 if [ -z "$3" ]; then
-   TAG="jamesmortensen/standalone-$BASE-cloud-$ARCH:latest"
+   TAG="jamesmortensen/standalone-$BASE-cloud-$ARCH"
 else
    TAG="$3"
 fi
 
 
-docker buildx build --platform linux/$1 -f Dockerfile.multi $PUSH_ARG --build-arg FROM=$FROM_ENTRY -t $TAG .
+if [ -z "$BUILD_DATE" ]; then
+   TAGS="-t $TAG:latest"
+else
+   TAGS="-t $TAG:latest -t $TAG:$BUILD_DATE"
+fi
+
+docker buildx build --platform linux/$1 -f Dockerfile.multi $PUSH_ARG --build-arg FROM=$FROM_ENTRY $TAGS .
 # podman build -f Dockerfile.multi --build-arg FROM=$FROM_ENTRY -t $TAG .
 
 if [ -n "$GITHUB_ENV" ]; then

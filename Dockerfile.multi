@@ -9,7 +9,6 @@ FROM ${FROM}
 USER root
 
 RUN sudo apt-get update -y && sudo apt-get install nginx --no-install-recommends -y \
-  && apt-get autoremove -y \ 
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
   && echo "alias l='ls -ltr'" >> /home/seluser/.bashrc
@@ -23,6 +22,34 @@ COPY nginx-service.conf /etc/supervisor/conf.d/
 #  && apt-get clean \
 #  && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
+# Relaxing permissions to be able to start nginx without root
+RUN chmod 777 /var/log/nginx \
+ && chmod 666 /var/log/nginx/* \
+ && touch /var/log/nginx/access.log \
+ && touch /var/log/nginx/error.log \
+ && mkdir /var/lib/nginx/body \
+ && mkdir /var/lib/nginx/proxy \
+ && mkdir /var/lib/nginx/uwsgi \
+ && mkdir /var/lib/nginx/scgi \
+ && mkdir /var/lib/nginx/fastcgi \
+ && chmod 775 /var/lib/nginx/body \
+ && chmod 775 /var/lib/nginx/proxy \
+ && chmod 775 /var/lib/nginx/uwsgi \
+ && chmod 775 /var/lib/nginx/scgi \
+ && chmod 775 /var/lib/nginx/fastcgi \
+ && chmod 777 /run \
+ && chmod 777 /var/lib/nginx \
+ && touch /etc/nginx/nginx.conf \
+ && chmod 777 /etc/nginx \
+ && chmod 777 /etc/nginx/nginx.conf \
+ && chmod +x /dev/shm \
+ && chown root:adm /var/lib/nginx \
+ && chown root:adm /run \
+ && usermod -aG adm www-data \
+ && usermod -aG adm seluser
+
+USER seluser
+
 # Set VNC password at runtime, from the Heroku config vars, and clear it from the environment.
 CMD if [ -n "$VNC_SECRET_PW" ]; then x11vnc -storepasswd $VNC_SECRET_PW /home/seluser/.vnc/passwd; unset VNC_SECRET_PW; fi \
   # Replaces the {{PORT}} template variable in the NGINX config with the platform assigned port
@@ -32,4 +59,4 @@ CMD if [ -n "$VNC_SECRET_PW" ]; then x11vnc -storepasswd $VNC_SECRET_PW /home/se
   # Start NGINX and other services
   && /opt/bin/entry_point.sh
 
-#EXPOSE $PORT
+EXPOSE $PORT

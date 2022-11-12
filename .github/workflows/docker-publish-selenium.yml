@@ -1,4 +1,4 @@
-name: Publish Selenium
+name: Publish Selenium Cloud Containers
 
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
@@ -18,12 +18,64 @@ env:
   # Use docker.io for Docker Hub if empty
   # github.repository as <account>/<repo>
   REGISTRY: 'docker.io'
-  #IMAGE_NAME: 'jamesmortensen/selenium-chrome-cloud'
-
 
 jobs:
-  push-to-docker-hub:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
+      - name: Remove GitHub release for today
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          BUILD_DATE=$(date +'%Y%m%d')
+          RELEASE_TAG=$BUILD_DATE-selenium-cloud-containers
+
+          echo "REPO=$REPO" >> $GITHUB_ENV
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
+          go install github.com/github-release/github-release@v0.10.0
+          echo "Remove old releases for today for v$RELEASE_TAG"
+          ~/go/bin/github-release delete \
+            -u $GITHUB_REPOSITORY_OWNER \
+            -r $REPO \
+            --tag v$RELEASE_TAG
+
+      - name: Remove git tag for today
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Remove tag for old release today:"
+          git push origin --delete v$RELEASE_TAG
+          
+      - name: Set build_date and release_tag 
+        id: prepare-draft
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+
+    outputs:
+      release_tag: ${{ steps.prepare-draft.outputs.release_tag }}
+      build_date: ${{ steps.prepare-draft.outputs.build_date }}
+
+
+  push-to-docker-hub:
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,16 +84,22 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
     strategy:
+      fail-fast: false
       matrix:
         browser: [ firefox ]
         arch: [ amd64, arm64 ]
         include:
-          # - browser: edge 
-          #   arch: amd64
+          - browser: edge 
+            arch: amd64
           - browser: chrome
             arch: amd64
           - browser: chromium
             arch: arm64
+    env:
+      ARCH: ${{ matrix.arch }}
+      BROWSER: ${{ matrix.browser }}
+      IMAGE_NAME: jamesmortensen/standalone-${{ matrix.browser }}-cloud-${{ matrix.arch }}
+      BUILD_DATE: ${{ needs.prepare.outputs.build_date }}
 
     steps:
       - name: Checkout repository
@@ -60,73 +118,131 @@ jobs:
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
-      # - name: Extract Docker metadata
-      #   id: meta
-      #   uses: docker/metadata-action@v4
-      #   with:
-      #     images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      # Build and push Docker image with Buildx (don't push on PR)
-      # https://github.com/docker/build-push-action
-      # - name: Build and push Docker image
-      #   id: build-and-push
-      #   uses: docker/build-push-action@v3
-      #   with:
-      #     context: .
-      #     file: Dockerfile.epiphany.nginx
-      #     push: ${{ github.event_name != 'pull_request' }}
-      #     #tags: ${{ steps.meta.outputs.tags }}
-      #     tags: ${{ steps.tagging.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     platforms: linux/amd64,linux/arm64
       - name: Build and push Docker image with Buildx (don't push on PR)
         id: build-and-push
         env:
-          ARCH: ${{ matrix.arch }}
-          BROWSER: ${{ matrix.browser }}
+          SHOULD_PUSH: ${{ github.event_name != 'pull_request' }}
         run: |
-          PUSH_ARG="${{ github.event_name != 'pull_request' }}"
+          if [ "$SHOULD_PUSH" = "true" ]; then
+            export PUSH_ARG="--push"
+          fi
           sh docker-build-image.sh $ARCH $BROWSER
 
-      - name: Create Tags
+      - name: Create Tags and Outputs
         id: tagging
         run: |
-          BUILD_DATE=$(date +'%Y%m%d')
+          echo BUILD_DATE is $BUILD_DATE
+          echo IMAGE_NAME is $IMAGE_NAME
+          echo "DRAFT_RELEASE_TAG=${{ needs.prepare.outputs.release_tag }}" >> $GITHUB_ENV
           echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$BUILD_DATE,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_OUTPUT
           IMAGE=`echo $IMAGE_NAME | sed 's/.*\///g'`
-          echo "release_tag=$BUILD_DATE-$IMAGE" >> $GITHUB_OUTPUT
+          echo IMAGE is $IMAGE
+          echo container_release_tag is $BUILD_DATE-$IMAGE
+          echo release_tag is ${{ needs.prepare.outputs.release_tag }}
+          echo "container_release_tag=$BUILD_DATE-$IMAGE" >> $GITHUB_OUTPUT
+          echo "release_tag=${{ needs.prepare.outputs.release_tag }}" >> $GITHUB_OUTPUT
       
       - name: Check release tag
         run: echo ${{ steps.tagging.outputs.release_tag }}
 
-      # - name: Publish release
-      #   if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     RELEASE_TAG: ${{ steps.tagging.outputs.release_tag }}
-      #   run: |
-      #     git tag v$RELEASE_TAG
-      #     git push origin v$RELEASE_TAG
-      #     echo "$RELEASE_TAG is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
-      #     echo "" >> release_notes.md
-      #     MINIBROWSER_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "cd /opt/bin && bash entry_point.sh & sleep 5 && /usr/lib/*-linux-gnu/webkit2gtk-4.0/MiniBrowser --version" | tail -n 1`
-      #     echo "MiniBrowser: $MINIBROWSER_VERSION" >> release_notes.md
-      #     echo "WebKitWebDriver: $MINIBROWSER_VERSION" >> release_notes.md
-      #     if echo "$IMAGE_NAME" | grep -q "epiphany"; then
-      #         EPIPHANY_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "epiphany --version" | tail -n 1`
-      #         echo "Epiphany: $EPIPHANY_VERSION" >> release_notes.md
-      #     fi
-      #     NGINX_VERSION=`docker run --rm $IMAGE_NAME:latest bash -c "nginx -v" | tail -n 1`
-      #     echo $NGINX_VERSION >> release_notes.md
-      #     REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
-      #     go install github.com/github-release/github-release@v0.10.0
-      #     echo "Set release notes"
-      #     ~/go/bin/github-release release -u $GITHUB_REPOSITORY_OWNER -r $REPO --tag v$RELEASE_TAG --name $RELEASE_TAG --description "`cat release_notes.md`"
+      - name: Prepare Release Notes
+        id: prepare-release
+        if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BROWSER: ${{ matrix.browser }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          echo "* standalone-$BROWSER-$ARCH-cloud is published to Docker Hub at [$IMAGE_NAME](https://hub.docker.com/r/$IMAGE_NAME/tags) and contains the following resources: " > release_notes.md
+          echo "" >> release_notes.md
+
+          if [ "$BROWSER" = "firefox" ] && [ "$ARCH" = "amd64" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/geckodriver --version | head -n 1"
+            export BROWSER_VERSION_COMMAND="firefox -version"
+          elif [ "$BROWSER" = "firefox" ] && [ "$ARCH" = "arm64" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/local/bin/geckodriver --version | head -n 1"
+            export BROWSER_VERSION_COMMAND="firefox -version"
+          elif [ "$BROWSER" = "chrome" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/chromedriver -version"
+            export BROWSER_VERSION_COMMAND="google-chrome -version"
+          elif [ "$BROWSER" = "chromium" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/chromedriver -version"
+            export BROWSER_VERSION_COMMAND="/usr/bin/chromium -version"
+          elif [ "$BROWSER" = "edge" ]; then
+            export DRIVER_VERSION_COMMAND="/usr/bin/msedgedriver -version"
+            export BROWSER_VERSION_COMMAND="microsoft-edge -version"
+          fi
+          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$BROWSER_VERSION_COMMAND"
+          echo docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$DRIVER_VERSION_COMMAND"
+          BROWSER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$BROWSER_VERSION_COMMAND"`
+          DRIVER_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "$DRIVER_VERSION_COMMAND"`
+
+          echo "Build release notes for $BROWSER"
+          echo "  + $BROWSER_VERSION" >> release_notes.md
+          echo "  + WebDriver: $DRIVER_VERSION" >> release_notes.md
+          NGINX_VERSION=`docker run --rm --platform linux/$ARCH $IMAGE_NAME bash -c "nginx -v" | tail -n 1`
+          echo $NGINX_VERSION >> release_notes.md
+          echo "success=true" >> $GITHUB_OUTPUT
+      
+      - name: Upload artifact release_notes.md
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.BROWSER }}-${{ env.ARCH }}-release_notes.md
+          path: |
+            release_notes.md
+
+    outputs:
+      container_release_tag: ${{ steps.tagging.outputs.container_release_tag }}
+      release_tag: ${{ steps.tagging.outputs.release_tag }}
+      success: ${{ steps.prepare-release.outputs.success }}
+
+
+  publish-release-notes:
+    if: always() && needs.push-to-docker-hub.outputs.success == 'true'
+    needs: push-to-docker-hub
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          path: release-notes-artifacts
+      
+      - name: Publish release
+        if: ${{ github.event_name != 'pull_request' }}  # || contains(toJson(github.event.commits), '[deploy]') == true }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.push-to-docker-hub.outputs.release_tag }}
+        run: |
+          git tag v$RELEASE_TAG
+          git push origin v$RELEASE_TAG
+          echo "Set release notes"
+          echo "Selenium Cloud Container browser images are published to Docker Hub: " > release_notes.md
+          echo "" >> release_notes.md
+          cat release-notes-artifacts/*.md/*.md >> release_notes.md
+          REPO=`echo $GITHUB_REPOSITORY | tr '/' '\n' | tail -n 1`
+          
+          echo "Publish the release:"
+          go install github.com/github-release/github-release@v0.10.0
+          ~/go/bin/github-release release \
+            -u $GITHUB_REPOSITORY_OWNER \
+            -r $REPO \
+            --tag v$RELEASE_TAG \
+            --name $RELEASE_TAG \
+            --description "`cat release_notes.md`"
+
+          echo "release notes published:"
+          cat release_notes.md
