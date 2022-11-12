@@ -22,6 +22,11 @@ COPY nginx-service.conf /etc/supervisor/conf.d/
 #  && apt-get clean \
 #  && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
+# Relaxing permissions to be able to start nginx without root
+RUN touch /etc/nginx/nginx.conf \
+ && chmod 777 /etc/nginx \
+ && chmod 777 /etc/nginx/nginx.conf
+
 USER seluser
 
 # Set VNC password at runtime, from the Heroku config vars, and clear it from the environment.
